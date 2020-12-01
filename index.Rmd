@@ -1,0 +1,852 @@
+---
+title: "复杂数据统计方法"
+author: "吴喜之"
+date: "2020/11/6"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+keywords:
+- 中文
+- R Markdown
+documentclass: ctexbook
+always_allow_html: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 引言
+## 作为科学的统计
+
+数据科学：数学逻辑和统计批判性思维，计算机科学，领域知识。
+
+## 数据分析的实践
+
+数据收集：有目的；有关的。
+
+数据预处理：格式，缺失，不一致。
+
+寻找合适的模型：机制分析，预测。
+
+比较模型的标准：统计模型，算法模型；显著性检验，交叉验证。
+
+对分析结果的解释：实际意义。
+
+## 数据的形式以及可能用到的模型
+
+数据形式：二维表，列联表，空间数据。
+
+自变量，因变量：预测，回归，分类；。
+
+时间序列数据；横截面数据；纵向数据；面板数据；生存数据；列联表数据。
+
+### 横截面数据：因变量为实数轴上的数量变量
+
+经典线性回归：假设，参数估计（点估计，区间估计），显著性检验，残差分析，多重共线性，自变量选择方法。
+
+### 横截面数据：因变量为分类变量、频数或定序变量
+
+### 纵向数据、多水平数据、面板数据、重复观测数据
+
+### 多元数据各变量之间的关系：多元分析
+
+### 抽样调查数据中垃圾比例的计算
+
+### 路径模型/结构方程模型
+
+### 贝叶斯网络
+
+### 多元时间序列数据
+
+## R软入门
+
+### 简介
+
+### 安装
+
+### 帮助
+
+### 快捷键
+
+### 动手：用中学（附录中的R练习程序）
+
+#### 实践1(最初几步）
+
+```{r}
+x <- 1:100 #把1,2, ... , 100这个整数向量赋值到x
+(x <- 1:100) #同上，只不过显示出来
+sample(x,20) #从1,2, ...,100中随机不放回地抽取20个值作为样本
+```
+
+#### 实践2
+
+## 国内统计学教材的若干误区
+
+### 假设检验的误区：不能拒绝就接受
+
+```{r}
+shapiro.test(1:50)
+x <- 1:500; ks.test(x = x, y = "pnorm", mean(x), sd(x),exact = TRUE)
+x <- c(-2000, -5000); y <- c(20000, 50000);
+t.test(x, y)
+```
+
+### 假设检验的误区：p值小于0.05就显著
+
+p值仅仅是根据一个样本计算出来的，用于估计“弃真”概率$\alpha$的值。
+
+### 置信区间的误区；含义理解；样本独立同正态分布
+
+### OLS线性回归中的误区
+
+1. 经典假设主观
+
+模型线性？
+
+样本点独立同分布，正太，大样本？
+
+损失函数对称，二次函数？
+
+2. 对回归结果的解释缺乏根据
+
+回归系数的意义：自变量独立么；
+
+p值小就显著；
+
+$R^2$越接近1，模型越好。
+
+```{r}
+z <- read.csv("Puredata/jingji.csv")
+a <- lm(GDP~就业,z); summary(a)
+a <- lm(GDP~资本+就业+电力,z); coefficients(a)
+a <- lm(GDP~就业+电力,z); coefficients(a)
+a <- lm(GDP~资本+就业,z); coefficients(a)
+a <- lm(GDP~资本+电力,z); coefficients(a)
+```
+
+3. 增加无关的或"错误的"自变量对预测无影响
+
+```{r}
+set.seed(10);
+x1 <- rnorm(2000)
+y <- 3 + 5*x1 + rnorm(2000)
+eg1 <- lm(y~x1)
+summary(eg1)
+x2 <- sin(rnorm(2000, 10))
+eg2 <- lm(y~x1+x2) #加上一个无关的周期变量，再拟合
+summary(eg2)
+```
+
+### 样本量多大算大样本？
+
+样本量$n>30$就是大样本？
+```{r}
+set.seed(10);
+y <- NULL;
+for(i in 1:5000){
+  y <- c(y, mean(rt(1000,2)))
+  }
+shapiro.test(y)
+```
+
+### 用31个省、自治区、直辖市数据能做什么？
+
+任何超出描述性统计方法都值得怀疑。
+
+### 汇总数据与原始数据的区别
+
+汇总数据会掩盖数据真正的特征，产生虚假现象。分组数越少，越不可靠。
+
+```{r}
+set.seed(999)
+n <- 600
+w <- data.frame(x = rnorm(n), y = rnorm(n))
+I <- c(4, 12, 30, 60, 120)
+par(mfrow = c(2, 3))
+plot(w, main = paste("n =", n, " r =", round(cor(w)[1,2], 2)))
+for (u in I) {
+  z <- NULL
+  for (i in 1:u) {
+    z <- rbind(z, apply(w[((i-1)*n/u + 1) : (i*n/u), ], 2, mean))
+  }
+  plot(z, main = paste("n =", u, " r =", round(cor(z)[1,2],2)))
+}
+```
+
+# 横截面数据回归：经典方法
+
+## 简单回归回顾
+
+公路-氧化碳数据cofreewy.txt：样本量 n = 24
+
+### 简单线性回归拟合
+
+逐步回归。残差的正态性检验。
+
+```{r}
+w <- read.table("PureData/cofreewy.txt", header = TRUE)
+a <- lm(CO~., w)
+summary(a)
+b <- step(a, direction = "backward")
+summary(b)
+shapiro.test(b$residuals)
+```
+
+### 简单线性回归的进一步分析：模型非线性
+
+QQ图：样本量小
+
+```{r}
+qqnorm(b$residuals);qqline(b$residuals)
+plot(w)
+```
+
+CO和Traffic近似线性关系；CO和Hour近似正弦曲线关系；其他变量间关系复杂。借助时间序列分析中的谐波分析，用有穷Fouier级数表示时间序列：
+$$x_t = a_0 + \sum_{p=1}^{\frac{N}{2}-1}\left[ a_p\cos\left(\frac{2\pi p t}{N}\right) + b_p\sin\left(\frac{2\pi p t}{N}\right)\right] +  a_{N/2}\cos\left(\pi t\right)$$
+
+多次尝试确定最高阶数p，使用逐步回归选择自变量：
+```{r}
+w <- read.table("PureData/cofreewy.txt", header = TRUE)
+w1 <- transform(w, Tsq = Traffic^2, Tcub = Traffic^3, Hour, Hsq = Hour^2, Hcub = Hour^3, Wind, Wsq = Wind^2, Wcub = Wind^3)
+# cor(w1)
+a <- lm(CO ~ Traffic + Wind + Wsq + Wcub + sin((2*pi/24)*Hour) + cos((2*pi/24)*Hour) +  sin((4*pi/24)*Hour) + cos((4*pi/24)*Hour), data = w1)
+b <- step(a)
+summary(b)
+shapiro.test(b$residuals)
+
+b1 <- lm(CO ~ Traffic + Wind + Wsq + cos((2*pi/24)*Hour) + cos((4*pi/24)*Hour), data = w1)
+summary(b1)
+shapiro.test(b1$residuals)
+qqnorm(b1$residuals); qqline(b1$residuals)
+```
+
+### 对简单线性回归的一些讨论：伪回归
+
+选择自变量的不同标准及其评价：从不同的角度解释模型。
+
+t检验和F检验的依据：必须检验随机误差项是否或近似服从正态分布。
+
+伪回归：
+
+```{r}
+set.seed(441010)
+x <- c(rnorm(100), 50)
+y <- c(rnorm(100), -50)
+plot(x, y)
+a <- lm(y ~ x)
+summary(a)
+shapiro.test(a$residuals)
+```
+
+### 损失函数与分位数回归
+
+回归模型：$y_i = \mu(x_i, \beta) + \epsilon_i = x_i^T\beta + \epsilon_i$
+
+参数$\beta$确定：$\mathop{\mathrm{arg\;min}}\limits_\beta \rho(y_i - \mu(x_i, \beta))$
+
+损失函数：$\rho(u) = u^2$ OLS
+
+$\rho(u) = |u|$，最小一乘回归时分位数回归（quantile regression）$\rho_\tau(u) = u(\tau - I(u < 0))$的特例 $\tau = 0.5$。
+
+```{r}
+library(quantreg)
+par(mfrow = c(1,2))
+data("engel")
+plot(engel)
+plot(log10(foodexp) ~ log10(income), data = engel, main = "'engel' data (log10 - tranformed)")
+taus <- c(0.15, 0.25, 0.50, 0,75, 0.95, 0.99)
+rqs <- as.list(taus)
+# for (i in seq(along.with = taus)) {
+#   rqs[[i]] <- rq(log10(foodexp) ~ log10(income), 
+#                  tau = taus[i], 
+#                  data = engel)
+#   lines(log10(engel$income), fitted(rqs[[i]]), col = i+1)
+# }
+legend("bottomright", paste("tau = ", taus), 
+       inset = 0.04, 
+       col = 2:(length(taus) + 1), lty = 1)
+```
+
+## 简单线性模型中的指数变换
+
+对因变量作Box-Cox变换，使其接近正态分布，但数据分布非单峰、各种分布的混合体、实际数据难以确定来自何种分布或完全没有确定的分布时，很难奏效。
+
+去掉编号CASE和日期ENTRY.DT，删除缺失值，COND变为两水平。
+```{r}
+w <- read.csv("PureData/pharynx.csv")
+w <- w[, -c(1,11)]
+w <- w[w$COND != 9 & w$GRADE != 9,]
+w$COND[w$COND == 3 | w$COND == 4] <- 2
+w$COND[w$COND == 0] <- 1
+write.csv(w, "pharynx1.csv", quote = FALSE, row.names = FALSE)
+```
+
+简单线性回归：
+```{r}
+u <- read.csv("pharynx1.csv")
+x <- 1:length(u)
+x <- x[-c(5,11)]
+for (i in x) {
+  u[,i] <- factor(u[,i])
+}
+a <- lm(TIME~., data = u)
+summary(a)
+shapiro.test(a$residuals) # 误差/因变量非正态
+```
+
+Box-Cox变换：
+$$y^{(\lambda)} = 
+\begin{cases}
+\frac{y^\lambda - 1}{\lambda},& \lambda \ne 0;\\
+\ln(y), & \lambda = 0.
+\end{cases}$$
+```{r}
+library(MASS)
+b <- boxcox(TIME~., data = u)
+lambda <- b$x[which(b$y == max(b$y))]
+a <- lm(TIME^lambda~., data = u)
+b <- step(a)
+summary(b) # 拟合效果不太好：$R^2$较小
+anova(b)
+shapiro.test(b$residuals) # 误差/因变量非正态
+```
+
+## 生存分析数据的Cox比例危险回归模型
+
+随机变量$T$表示寿命，其累积分布$F(t)=P(T\le t)$，分布密度为$f(t)$。
+
+活过时间$t$的概率$S(t)$，称为生存函数(survival function)：$S(t)=P(T>t)=1-P(T\le t)=1-F(t)$。
+
+危险函数(hazard function)$h(t)$实际上是$-\ln S(t)$的导数，累积危险函数$H(t)=\int_0^t h(u)\mathrm{d}u$：
+\begin{align}
+h(t) &= \lim_{\Delta t\rightarrow 0}\frac{P(t\le T \le t+\Delta t|T
+\ge t)}{\Delta t} \nonumber\\
+&= \lim_{\Delta t\rightarrow 0}\frac{F(t+\Delta t) - F(t)}{(1-F(t)\Delta t} \nonumber\\
+&= \frac{f(t)}{S(t)} = \frac{\mathrm{d} }{\mathrm{d}t}[-\ln S(t)]\nonumber
+\end{align}
+
+生存函数、危险函数等价，可相互推导。
+
+仅考虑实验代码TX对生存时间TIME的影响：
+```{r}
+library(survival)
+# fit <- survfit()
+```
+
+
+
+# An Introduction to R
+
+## Introduction and preliminaries
+
+### Getting help with functions and features
+
+```{r}
+# help(solve)
+# ?solve
+# help("[[")
+# help.start()
+# help.search("solve")
+# ??solve
+# example("solve")
+# ?help
+```
+
+### Executing commands from or deverting output to a file
+
+```{r}
+# source("commands.R")
+# sink("sink-examp.txt")
+# i <- 1:10
+# outer(i, i, "*")
+# sink()
+# i
+```
+
+## Data permanency and removing objects
+
+```{r}
+ls()
+rm(list = objects())
+```
+
+## Simple manipulatins: numbers and vectors
+
+### Vectors and assignment
+
+```{r}
+x <- c(10.4, 5.6, 3.1, 6.4, 21.7) # concatenate
+assign("x", c(10.4, 5.6, 3.1, 6.4, 21.7))
+c(10.4, 5.6, 3.1, 6.4, 21.7) -> x
+1/x # -> .last.value
+(y <- c(x, 0, -x))
+```
+
+### Vector arithmetic
+
+```{r}
+v <- 2*x + y +1 # recycle match to the longest vector
+log(x) + exp(x) + sin(x) + sqrt(x)
+diff(range(x)) == max(x) - min(x)
+pmax(x, 10)
+var(x) - sum((x - mean(x))^2)/(length(x) - 1)
+sort(x) == x[order(x)]
+sqrt(-16)
+sqrt(-16+0i)
+```
+
+### Generating regular sequences
+
+```{r}
+n <- 10
+2*1:n # colon oprator: high priority
+1:n-1
+1:(n-1)
+n:1
+
+x <- seq(-5, 6, by = 2) # sequence
+seq(from = -5, by = 0.2, length.out = 5)
+seq(to = 5, by = 0.2, length.out = 5)
+seq(along.with = x)
+
+rep(1:3, times = 2) # replicate
+rep(1:3, each = 3)
+rep(1:3, each = 3, times = 2)
+```
+
+### Logical vectors
+
+```{r}
+# logical: TRUE, FALSE, NA(not available)
+x <- seq(-6, 5, by = 2) 
+x > 2
+x & 2
+!x
+(!x) + 2
+```
+
+### Missing values
+
+`NA`: "not available" or "missing value". In general any operation on an `NA` becomes an `NA`.
+
+`NAN`: "Not a Number".
+
+```{r}
+(z <- c(1:3, NA, 0/0, -Inf))
+is.na(z)
+is.nan(z)
+```
+
+### Character vectors
+
+```{r}
+# ?Quotes # a full list of C-style escape sequences
+paste(c("x", "y"), 1:10, sep = "")
+```
+
+### Index vectors: selecting and modifying subsets of a data set
+
+```{r}
+# A logical vector
+(x <- 2*c(1:3, NA, 0/0, -Inf))
+x[!is.na(x)]
+(x-2)[(!is.na(x)) & x>0]
+x[c(TRUE, FALSE)]
+
+# A vector of positive integral quantities
+x[2:4]
+c("x", "y")[rep(c(1,2,2,1), times = 2)]
+
+# A vector of negative integral quantities
+x[-c(2:4)]
+
+# A vector of character strings: name its components firstly
+fruit <- c(5, 10, 1, 20)
+names(fruit) <- c("orange", "banana", "apple", "peach")
+fruit[c("apple", "orange")]
+
+x[is.na(x)] <- 0
+x
+x[x < 3] <- -x[x < 3]
+x
+```
+
+## Objects: their modes and attibutes
+
+### Intrinsic attributes: mode and length
+
+`model` *atomic*: *numerical*(*integer*, *double*), *complex*, *logical*, *character*, *raw*.
+
+`model` *list* or recursive: *list*, *function*, *expression*(such as *formulae*).
+
+Further properties: `attribute`. `attr`.
+
+coercion of change of mode: `as.something`. NOT exactly reversible.
+
+```{r}
+mode(1+2i)
+length(numeric(0))
+x <- as.character(c(1:5))
+as.integer(x)
+```
+
+### Changing the length of an object
+
+```{r}
+e <- numeric()
+length(e)
+e[3] <- 17
+length(e) <- 5
+```
+### Getting and setting attribute
+
+`attribute(object)`: all the non-intrinsic attributes.
+
+`attr(object, name`): a specific attribute.
+
+Rarely used; Caution: assign or delete an attribute.
+
+```{r}
+z <- c(1:12)
+attr(z, "dim") <- c(3, 4)
+z
+```
+
+### The class of an object
+
+`class`: for object-oriented style of programming. For example, `plot()` will display in the different ways when faced with different classes.
+
+If `winter` is a data.frame, `unclass(winter)` will print it as an ordinary list.
+
+## Ordered an unordered factors
+
+`factor`: for discrete classification (grouping) vector.
+
+### A specific example
+
+```{r}
+state <- c("tas", "sa",  "qld", "nsw", "nsw", "nt",  "wa",  "wa","qld", "vic", "nsw", "vic", "qld", "qld", "sa",  "tas","sa",  "nt",  "wa",  "vic", "qld", "nsw", "nsw", "wa","sa",  "act", "nsw", "vic", "vic", "act")
+statef <- factor(state)
+statef
+levels(statef)
+```
+
+### 循环向量化：split, unstack, lapply, sapply, apply, tapply, by, mapply
+
+* `lst <- split(x, fac)`
+* `tapply(x, fac, FUN, ...)`
+* `lst <- lapply(lst, FUN, ...)`
+* `vec <- sapply(lst, FUN, ...)`
+* `vapply(lst, FUN, FUN.VALUE)`
+* `apply(x, MARGIN, FUN, ...)`
+* `by(data, INDICES, FUN, ...)`
+* `mapply(fun, vec1, ..., vecN)`
+
+#### 向量分组split
+
+`lst <- split(x, fac)`：x为vector或dataframe；fac为分组因子gouping factor，返回一个列表。
+
+`lst <- unstack(data.frame(x, fac))` 作用同上
+
+`df <- stack(lst)` 逆操作
+
+
+```{r}
+library(MASS)
+(glist <- split(Cars93$MPG.city, Cars93$Origin))
+lapply(glist, mean)
+```
+
+#### 将函数应用于组数据tapply
+
+数据以小组为单位呈现，需按分组处理数据。
+
+`tapply(x, fac, FUN, ...)`：x为ragged array；fac为分组因子；`...`为FUN的参数。
+
+```{r}
+head(warpbreaks)
+tapply(warpbreaks$breaks, warpbreaks$wool, mean)
+tapply(warpbreaks$breaks, warpbreaks[,-1], mean)
+tapply(warpbreaks$breaks, warpbreaks[,-1], mean, trim = 0.2)
+```
+
+#### 将函数作用于列表的每个元素lapply, sapply, vapply
+
+`lst <- lapply(lst, FUN, ...)`：`...`为fun的参数；通常返回一个列表。list version of apply
+
+`vec <- sapply(lst, FUN, ...)`：尽可能返回向量，也可能是矩阵、列表。simplify version of lapply
+
+`vapply(lst, FUN, FUN.VALUE)`：FUN.VALUE指定返回值的预定义格式pre-specified type  of return value。similar to sapply
+
+```{r}
+score <- list(s1 = c(89, 91), s2 = c(89, 90, 91), s3 = c(80, 81, 82, 83))
+lapply(score, length)
+sapply(score, length)
+
+lapply(score, range)
+sapply(score, range)
+
+tests <- lapply(score, t.test)
+sapply(tests, function(t) t$conf.int)
+```
+
+```{r}
+x <- list(a = 1:10, beta = exp(-3:3), logic = c(TRUE,FALSE,FALSE,TRUE))
+lapply(x, quantile)
+sapply(x, quantile)
+lapply(x, quantile, probs = 1:3/4)
+
+
+i39 <- sapply(3:9, seq) # list of vectors
+lapply(i39, fivenum)
+sapply(i39, fivenum)
+vapply(i39, fivenum, 
+       FUN.VALUE = c(Min. = 0, "1st Qu." = 0, Median = 0, "3rd Qu." = 0, Max. = 0))
+```
+
+#### 将函数作用于每行或每列apply
+
+`apply(x, MARGIN, FUN, ...)`：x为array，包括matrix；MARGIN = 1 时，作用于每行，MARGIN = 2 时，作用于每列；`...`为FUN的参数。
+
+```{r}
+(x <- cbind(x1 = 3, x2 = c(4:1, 2:5)))
+apply(x, 2, mean)
+apply(x, 2, mean, trim = 0.2)
+apply(x, 1, mean)
+```
+
+#### 将函数作用于数据框的行by
+
+`by(data, INDICES, FUN, ...)`：data为数据框，矩阵等；INDECES为与data的行数等长的因子；`...`为FUN的参数。
+
+```{r}
+head(warpbreaks)
+by(warpbreaks, warpbreaks$wool, summary)
+(models <- by(warpbreaks, warpbreaks$wool, function(df) lm(breaks~tension, data = warpbreaks)))
+lapply(models, confint)
+```
+
+#### 函数向量化：将函数应用于平行向量或列表mapplys
+
+函数向量化：使函数逐个作用于向量（paralell vectour平行向量）、列表（多个列表）的的每个元素，返回一个向量、列表。
+
+`mapply` is a multivariate version of `sapply`.
+
+`mapply(fun, vec1, ..., vecN)`：vec作为fun的参数，需等长，否则使用循环规则。
+
+`mapply(fun, list1, ..., listN)`：
+
+```{r}
+gcd <- function(a, b){
+  if(b==0) 
+    return(a)
+  else
+    return(gcd(b, a%%b))
+}
+gcd(3,6)
+# gcd(c(1,2,3), c(9,6,3))
+mapply(gcd, c(1,2,3), c(9,6,3))
+```
+
+
+### Ordered factors
+
+`factor(x = character(), levels, labels = levels, exclude = NA, ordered = is.orderer(x), nmax = NA)`
+
+`ordered(x, ...)`
+
+`is.factor(x)`, `is.ordered(x)`
+
+`as.factor(x)`, `as.ordered(x)`
+
+## Arrays and matrices
+
+### Arrays
+
+### Array indexing: Subsections of an array
+
+### Index matrices
+```{r}
+(x <- array(1:20, dim=c(4,5)))
+(i <- array(c(1:3,3:1), dim=c(3,2)))
+x[i]
+x[i] <- 0
+x
+```
+
+### Essential R Packages: Tidyverse
+
+```{r}
+library(readr)
+expectancy <- read_csv("PureData/NCHS_-_Death_rates_and_life_expectancy_at_birth.csv")
+names(expectancy) <- c("year", "race", "sex", "life_expectancy", "death_rate")
+summary(expectancy)
+trend <- expectancy[expectancy$race == "All Races" & expectancy$sex == "Both Sexes",]
+plot(trend$year, trend$life_expectancy)
+abline(0,1)
+lm(life_expectancy ~ year, data = trend)
+
+library(tidyverse)
+iris
+iris %>% as_tibble()
+
+expectancy %>%  filter(race == "All Races") %>%  summarize(avg = mean(death_rate)) %>%  mutate(avg = round(avg, 1))
+
+expectancy %>%  filter(race == "All Races") %>%  group_by(sex) %>%  summarize(avg = mean(death_rate)) %>%  mutate(avg = round(avg, 1))
+
+labels <- tribble(    ~key, ~new_label,    "Both Sexes",   "All Genders",    "Female",   "Identifies Female",    "Male",   "Identifies Male"  )
+expectancy %>%  filter(race == "All Races") %>%  group_by(sex) %>%  summarize(avg = mean(death_rate)) %>% inner_join(labels, by = c("sex" = "key")) %>% mutate(avg = round(avg, 1)) %>% select(gender = new_label, avg_death_rate = avg)
+
+expectancy %>%  filter(str_detect(race, "All"))
+
+t <- 2 + 5
+```
+
+
+
+
+
+## Appendix A Asample session
+
+```{r}
+# help.start()
+
+x <- rnorm(50)
+y <- rnorm(x)
+plot(x, y)
+ls()
+rm(x, y)
+```
+
+```{r}
+x <- 1:20
+w <- 1 + sqrt(x)/2
+dummy <- data.frame(x = x, y = x + rnorm(x)*w)
+fm <- lm(y ~ x, data = dummy)
+summary(fm)
+fm1 <- lm(y ~ x, data = dummy, weights = 1/w^2)
+summary(fm1)
+attach(dummy)
+lrf <- lowess(x, y)
+plot(x, y)
+lines(x, lrf$y)
+abline(0, 1, lty = 3)
+abline(coef(fm))
+abline(coef(fm1), col = "red")
+detach(dummy)
+plot(fitted(fm), resid(fm),
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     main = "Residuals vs Fitted")
+qqnorm(resid(fm), main = "Residuals Rankit Plot")
+rm(list = ls())
+```
+
+```{r}
+filepath <- system.file("data", "morley.tab", package = "datasets")
+filepath
+file.show(filepath)
+
+mm <- read.table(filepath)
+mm
+mm$Expt <- factor(mm$Expt)
+mm$Run <- factor(mm$Run)
+attach(mm)
+plot(Expt, Speed,
+     main = "Speed of Light Data",
+     xlab = "Experiment No.")
+fm <- aov(Speed ~ Run + Expt, data = mm)
+summary(fm)
+fm0 <- update(fm, . ~ . - Run)
+anova(fm0, fm)
+detach(mm)
+rm(list = ls())
+```
+
+```{r}
+x <- seq(-pi, pi, length.out = 50)
+y <- x
+f <- outer(x, y, function(x, y) cos(y)/(1 + x^2))
+oldpar <- par(no.readonly = TRUE)
+par(pty = "s")
+contour(x, y, f)
+contour(x, y, f, nlevels = 15, add = TRUE)
+fa <- (f - t(f))/2
+contour(x, y, fa, nlevels = 15)
+par(oldpar)
+image(x, y, f)
+image(x, y, fa)
+objects()
+rm(list = objects())
+```
+
+```{r}
+th <- seq(-pi, pi, length.out = 100)
+z <- exp(1i*th)
+par(pty = "s")
+plot(z, type = "l")
+w <- rnorm(100) + rnorm(100) * 1i
+w <- ifelse(Mod(w) > 1, 1/w, w)
+plot(w, xlim = c(-1, 1), ylim = c(-1, 1), pch = "+", xlab = "x", ylab = "y")
+lines(z)
+w <- sqrt(runif(100)*exp(2*pi*runif(100))*1i)
+plot(w, xlim = c(-1, 10), ylim = c(-1, 10), pch = "+", xlab = "x", ylab = "y")
+lines(z)
+rm(list = ls())
+```
+
+
+```{r}
+dnorm(0) # density, PDF, Probability Density Function
+dnorm(2, mean = 5, sd = 3)
+curve(dnorm, from = -3, to = 3)
+x <- seq(-3,3, by = 0.1)
+plot(x, dnorm(x))
+pnorm(0) # probability, CDF, Cumulative Distribution Function
+curve(pnorm(x), from = -3, to = 3)
+plot(x, pnorm(x))
+qnorm(0.5) # quantile
+curve(qnorm(x))
+rnorm(x) # random number
+hist(rnorm(x))
+```
+
+```{r}
+library(DT)
+datatable(iris)
+detach("package:DT")
+```
+
+
+## R Markdown
+
+see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button:
+
+```{r cars}
+summary(cars)
+```
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+测试第一次提交是否成功？
